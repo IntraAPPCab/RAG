@@ -1,0 +1,17 @@
+# ---- Servidor y API Web ----
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+
+# ---- Lógica de RAG y LangChain ----
+langchain
+langchain_community
+langchain-ollama
+langchain-chroma
+fastembed
+PyMuPDF
+
+# ---- Conexión a Base de Datos ----
+psycopg2-binary
+SQLAlchemy

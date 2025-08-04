@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', path='favicon.ico') }}" type="image/x-icon">
+    <title>Chat con RAG</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f0f2f5; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #chat-container { width: 90%; max-width: 800px; height: 90vh; background-color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        
+        /* --- Estilos para la barra superior --- */
+        #top-bar { padding: 10px 20px; border-bottom: 1px solid #ddd; background-color: #f8f9fa; display: flex; align-items: center; }
+        #top-bar label { margin-right: 10px; font-weight: bold; font-size: 14px; color: #333; }
+        #source-select { padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+        /* --- Fin de nuevos estilos --- */
+
+        #chat-box { flex-grow: 1; padding: 20px; overflow-y: auto; }
+        .message { margin-bottom: 15px; line-height: 1.4; display: flex; }
+        .bot-message { justify-content: flex-start; }
+        .user-message { justify-content: flex-end; }
+        .bot-message .content { background-color: #e9e9eb; display: inline-block; padding: 10px 15px; border-radius: 18px; max-width: 80%; }
+        .user-message .content { background-color: #007bff; color: white; display: inline-block; padding: 10px 15px; border-radius: 18px; max-width: 80%; }
+        #input-form { display: flex; padding: 15px; border-top: 1px solid #ddd; }
+        #input-box { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 18px; font-size: 16px; margin-right: 10px; }
+        #send-button { background-color: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 18px; cursor: pointer; font-size: 16px; }
+        #send-button:disabled { background-color: #a0c7ff; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="top-bar">
+            <label for="source-select">Consultar en:</label>
+            <select id="source-select">
+                <option value="documents">Documentos (PDFs)</option>
+                
+                {% for db_name in db_names %}
+                    <option value="{{ db_name }}">{{ db_name.replace('_', ' ').title() }}</option>
+                {% endfor %}
+                </select>
+        </div>
+        <div id="chat-box">
+            <div class="message bot-message">
+                <div class="content">Hola 👋 ¿En qué puedo ayudarte hoy? Selecciona una fuente de datos y haz tu pregunta.</div>
+            </div>
+        </div>
+        <form id="input-form" onsubmit="sendMessage(event)">
+            <input type="text" id="input-box" placeholder="Escribe tu pregunta aquí..." autocomplete="off">
+            <button type="submit" id="send-button">Enviar</button>
+        </form>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const inputBox = document.getElementById('input-box');
+        const sendButton = document.getElementById('send-button');
+        const sourceSelect = document.getElementById('source-select');
+
+        async function sendMessage(event) {
+            event.preventDefault();
+            const userText = inputBox.value.trim();
+            if (userText === '') return;
+
+            appendMessage(userText, 'user');
+            inputBox.value = '';
+            setLoading(true);
+
+            const selectedSource = sourceSelect.value;
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        question: userText,
+                        source: selectedSource
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Error del servidor: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                appendMessage(data.result, 'bot');
+
+            } catch (error) {
+                console.error('Error al contactar la API:', error);
+                appendMessage(`Lo siento, ocurrió un error: ${error.message}`, 'bot');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function appendMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'content';
+            contentDiv.textContent = text;
+            
+            messageDiv.appendChild(contentDiv);
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+        
+        function setLoading(isLoading) {
+            inputBox.disabled = isLoading;
+            sendButton.disabled = isLoading;
+            sourceSelect.disabled = isLoading;
+            if (isLoading) {
+                sendButton.textContent = '...';
+            } else {
+                sendButton.textContent = 'Enviar';
+            }
+        }
+    </script>
+</body>
+</html>
